@@ -1,40 +1,48 @@
-# SmartAcroReader - Complete Rebuild
+# SmartAcroReader
 
 ## Current State
-The app has persistent React error #185 (infinite re-render loop) caused by complex state management, pdfjs-dist library integration, unnecessary auth providers, and unstable hook references across multiple versions.
+The project has a React/TypeScript frontend with shadcn/ui components. Previous versions had persistent issues with PDF.js worker loading, causing PDFs not to open. The UI was an Adobe Acrobat-style dark theme but features were either shells or broken due to missing/misconfigured packages.
 
 ## Requested Changes (Diff)
 
 ### Add
-- Brand new, minimal App.tsx with simple useState only (no context providers, no complex hooks)
-- PDF rendered via native `<object>` or `<iframe>` tag using browser's built-in PDF viewer (zero risk of React errors)
-- Adobe Acrobat-style layout: dark left sidebar, top toolbar, main viewer area
-- File upload via click or drag-and-drop
-- Sidebar shows list of opened PDF files with thumbnails (file name + icon)
-- Toolbar with all feature buttons: Highlight, Comment, Draw, Stamp, Edit Text, Crop Pages, Delete Page, Split PDF, Merge PDF, Compress, Convert (to Word/Excel/PPT), Rotate, Zoom in/out
-- Feature panels that slide in when a tool is activated (simple show/hide state)
-- Toast notifications for actions
+- Complete rebuild of all frontend UI with new dark professional theme (Adobe Acrobat-style)
+- PDF viewer using PDF.js with worker loaded from CDN (unpkg) — this is the critical fix
+- Dashboard landing page with feature overview
+- Left sidebar: file library, page thumbnails panel
+- Top toolbar: all tools accessible
+- Right panel: context-sensitive tool options
+- Features:
+  - Upload and open PDFs (core, must work reliably)
+  - Highlight / draw / comment annotations on canvas overlay
+  - E-signatures (draw or type, embed into page)
+  - OCR using Tesseract.js (extract text from scanned PDFs)
+  - Merge multiple PDFs (pdf-lib)
+  - Split PDF into pages or ranges (pdf-lib)
+  - Create PDF from images (pdf-lib)
+  - Password protect PDF (pdf-lib encryption)
+  - Fill form fields
+  - Version history (localStorage-based)
+  - Responsive layout for desktop/tablet/mobile
+- "Not available" labels on: Convert to Word/Excel/PPT, Create from Word/Excel
 
 ### Modify
-- Delete ALL existing page components (Dashboard, ViewerPage, LandingPage, PaymentSuccess, PaymentFailure)
-- Delete PDFViewer.tsx, ProfileSetupModal.tsx, UpgradeModal.tsx, all hooks (useActor, useFileStore, useInternetIdentity, useQueries)
-- Delete store/fileStore.ts, utils/StorageClient.ts
-- main.tsx: Remove ALL providers, render <App /> directly with no wrappers
+- App.tsx: full replacement with new layout and routing
+- index.css: new dark theme design tokens
 
 ### Remove
-- All auth/login flows
-- All Stripe/payment flows  
-- All backend API calls
-- pdfjs-dist usage
-- React Router (use simple state-based view switching)
+- All old viewer components and broken PDF rendering code
+- Auth hooks usage in main app flow
+- Any Stripe references in UI
 
 ## Implementation Plan
-1. Rewrite main.tsx to render <App /> with zero providers
-2. Rewrite App.tsx as self-contained single component managing:
-   - `files`: array of {id, name, url} (blob URLs)
-   - `activeFile`: currently selected file id
-   - `activeTool`: currently active toolbar tool
-3. Build AcrobatLayout inside App.tsx or as sibling component (no providers needed)
-4. Use `<object data={url} type="application/pdf">` for PDF rendering
-5. All feature tool buttons show a bottom panel or right panel when clicked
-6. Delete unused files to keep codebase clean
+1. Replace index.css with dark Acrobat-style design tokens (OKLCH dark palette)
+2. Create App.tsx with dashboard + viewer layout
+3. Create PDFViewer component — loads pdfjs-dist, sets worker via CDN URL from unpkg, renders each page to canvas
+4. Create AnnotationLayer component — SVG/canvas overlay for highlights, drawings, comments
+5. Create Toolbar component — all tool buttons, upload trigger
+6. Create Sidebar component — file library list, page thumbnails
+7. Create tools: SignatureModal, OCRModal, MergeModal, SplitModal, ProtectModal, CreateFromImagesModal
+8. Wire localStorage for version history and file library
+9. Install packages: pdfjs-dist, pdf-lib, tesseract.js
+10. Validate build passes

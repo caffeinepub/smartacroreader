@@ -1,717 +1,394 @@
 import { Toaster } from "@/components/ui/sonner";
 import {
-  ChevronDown,
-  Crop,
-  Eye,
-  FileDown,
-  FileSpreadsheet,
   FileText,
-  Highlighter,
-  Loader2,
+  ImagePlus,
+  Layers,
   Merge,
-  MessageSquare,
-  Minimize2,
   PenTool,
-  Presentation,
-  RotateCw,
+  ScanText,
   Scissors,
-  Stamp,
-  Trash2,
-  Type,
-  Underline,
+  Shield,
   Upload,
-  X,
-  ZoomIn,
-  ZoomOut,
 } from "lucide-react";
-import type React from "react";
 import { useCallback, useRef, useState } from "react";
 import { toast } from "sonner";
+import PDFViewer from "./components/PDFViewer";
+import Sidebar from "./components/Sidebar";
+import Toolbar from "./components/Toolbar";
+import CreateFromImagesModal from "./components/modals/CreateFromImagesModal";
+import MergeModal from "./components/modals/MergeModal";
+import OCRModal from "./components/modals/OCRModal";
+import ProtectModal from "./components/modals/ProtectModal";
+import SignatureModal from "./components/modals/SignatureModal";
+import SplitModal from "./components/modals/SplitModal";
+import type {
+  ActiveTool,
+  Annotation,
+  CurrentFile,
+  RecentFile,
+} from "./types/pdf";
 
-interface PDFFile {
-  id: string;
-  name: string;
-  url: string;
+const RECENT_KEY = "smartacroreader_recent";
+
+function loadRecent(): RecentFile[] {
+  try {
+    return JSON.parse(localStorage.getItem(RECENT_KEY) || "[]");
+  } catch {
+    return [];
+  }
 }
 
-type ToolId =
-  | "highlight"
-  | "comment"
-  | "underline"
-  | "draw"
-  | "stamp"
-  | "editText"
-  | "crop"
-  | "deletePage"
-  | "rotate"
-  | "split"
-  | "merge"
-  | "compress"
-  | "toWord"
-  | "toExcel"
-  | "toPPT";
-
-interface ToolInfo {
-  id: ToolId;
-  label: string;
-  icon: React.ReactNode;
-  description: string;
-  modal?: boolean;
-}
-
-const annotateTools: ToolInfo[] = [
-  {
-    id: "highlight",
-    label: "Highlight",
-    icon: <Highlighter size={14} />,
-    description:
-      "Highlight text in the PDF. Click and drag over text to apply.",
-  },
-  {
-    id: "comment",
-    label: "Comment",
-    icon: <MessageSquare size={14} />,
-    description: "Add sticky note comments to any part of the document.",
-  },
-  {
-    id: "underline",
-    label: "Underline",
-    icon: <Underline size={14} />,
-    description: "Underline selected text in the document.",
-  },
-  {
-    id: "draw",
-    label: "Draw",
-    icon: <PenTool size={14} />,
-    description: "Freehand drawing tool — draw shapes and markups on the PDF.",
-  },
-  {
-    id: "stamp",
-    label: "Stamp",
-    icon: <Stamp size={14} />,
-    description: "Apply stamps like Approved, Confidential, or Draft to pages.",
-  },
-];
-
-const editTools: ToolInfo[] = [
-  {
-    id: "editText",
-    label: "Edit Text",
-    icon: <Type size={14} />,
-    description: "Click on any text to edit it directly within the PDF.",
-  },
-  {
-    id: "crop",
-    label: "Crop Pages",
-    icon: <Crop size={14} />,
-    description: "Crop and resize pages by defining a crop box area.",
-  },
-  {
-    id: "deletePage",
-    label: "Delete Page",
-    icon: <Trash2 size={14} />,
-    description: "Remove the current page from the document permanently.",
-  },
-  {
-    id: "rotate",
-    label: "Rotate",
-    icon: <RotateCw size={14} />,
-    description: "Rotate the current page 90° clockwise.",
-  },
-];
-
-const organizeTools: ToolInfo[] = [
-  {
-    id: "split",
-    label: "Split PDF",
-    icon: <Scissors size={14} />,
-    description: "Split this PDF into multiple files.",
-    modal: true,
-  },
-  {
-    id: "merge",
-    label: "Merge PDF",
-    icon: <Merge size={14} />,
-    description: "Merge multiple PDFs into one combined file.",
-    modal: true,
-  },
-];
-
-const convertTools: ToolInfo[] = [
-  {
-    id: "compress",
-    label: "Compress",
-    icon: <Minimize2 size={14} />,
-    description: "Reduce file size while preserving quality.",
-    modal: true,
-  },
-  {
-    id: "toWord",
-    label: "To Word",
-    icon: <FileDown size={14} />,
-    description: "Convert this PDF to an editable Word (.docx) file.",
-    modal: true,
-  },
-  {
-    id: "toExcel",
-    label: "To Excel",
-    icon: <FileSpreadsheet size={14} />,
-    description: "Convert PDF tables to an Excel spreadsheet (.xlsx).",
-    modal: true,
-  },
-  {
-    id: "toPPT",
-    label: "To PPT",
-    icon: <Presentation size={14} />,
-    description: "Convert this PDF to a PowerPoint presentation (.pptx).",
-    modal: true,
-  },
-];
-
-const featureCards = [
-  {
-    icon: <Eye size={22} />,
-    title: "View & Navigate",
-    desc: "Smooth scrolling, zoom controls, thumbnail sidebar, and page navigation.",
-  },
-  {
-    icon: <Highlighter size={22} />,
-    title: "Annotate & Comment",
-    desc: "Highlight, underline, draw, stamp, and add sticky notes to any page.",
-  },
-  {
-    icon: <Type size={22} />,
-    title: "Edit PDF",
-    desc: "Edit text and images directly inside the document — no conversion needed.",
-  },
-  {
-    icon: <Scissors size={22} />,
-    title: "Organize Pages",
-    desc: "Split, merge, rotate, crop, and delete pages with ease.",
-  },
-  {
-    icon: <FileDown size={22} />,
-    title: "Convert Files",
-    desc: "Export to Word, Excel, or PowerPoint formats in seconds.",
-  },
-  {
-    icon: <Minimize2 size={22} />,
-    title: "Compress",
-    desc: "Reduce file size drastically while keeping visual quality intact.",
-  },
-];
-
-function ToolButton({
-  tool,
-  active,
-  onClick,
-}: { tool: ToolInfo; active: boolean; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`flex items-center gap-2 w-full px-3 py-1.5 rounded text-sm transition-colors ${
-        active
-          ? "bg-[oklch(0.55_0.22_25)] text-white"
-          : "text-[oklch(0.75_0.01_270)] hover:bg-[oklch(0.22_0.03_270)] hover:text-white"
-      }`}
-    >
-      {tool.icon}
-      {tool.label}
-    </button>
-  );
-}
-
-function ToolSection({
-  title,
-  tools,
-  activeTool,
-  onTool,
-}: {
-  title: string;
-  tools: ToolInfo[];
-  activeTool: ToolId | null;
-  onTool: (t: ToolId) => void;
-}) {
-  return (
-    <div className="mb-3">
-      <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-[oklch(0.50_0.015_270)]">
-        {title}
-      </div>
-      {tools.map((t) => (
-        <ToolButton
-          key={t.id}
-          tool={t}
-          active={activeTool === t.id}
-          onClick={() => onTool(t.id)}
-        />
-      ))}
-    </div>
-  );
-}
-
-function ProcessingModal({
-  tool,
-  onClose,
-}: { tool: ToolInfo; onClose: () => void }) {
-  const [processing, setProcessing] = useState(false);
-  const [done, setDone] = useState(false);
-
-  const handleProcess = () => {
-    setProcessing(true);
-    setTimeout(() => {
-      setProcessing(false);
-      setDone(true);
-    }, 2000);
-  };
-
-  return (
-    <div
-      className="fixed inset-0 bg-black/60 flex items-center justify-center z-50"
-      data-ocid="tool.modal"
-    >
-      <div className="bg-[oklch(0.17_0.025_270)] border border-[oklch(0.25_0.02_270)] rounded-lg p-6 w-80 shadow-xl">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2 text-white font-semibold">
-            {tool.icon}
-            {tool.label}
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-[oklch(0.55_0.015_270)] hover:text-white transition-colors"
-            data-ocid="tool.close_button"
-          >
-            <X size={16} />
-          </button>
-        </div>
-        <p className="text-sm text-[oklch(0.70_0.01_270)] mb-5">
-          {tool.description}
-        </p>
-        {!done ? (
-          <button
-            type="button"
-            onClick={handleProcess}
-            disabled={processing}
-            className="w-full py-2 rounded bg-[oklch(0.55_0.22_25)] hover:bg-[oklch(0.50_0.22_25)] text-white text-sm font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-70"
-            data-ocid="tool.primary_button"
-          >
-            {processing ? (
-              <>
-                <Loader2 size={14} className="animate-spin" />
-                Processing...
-              </>
-            ) : (
-              `Run ${tool.label}`
-            )}
-          </button>
-        ) : (
-          <>
-            <div
-              className="text-center text-sm text-green-400 mb-3"
-              data-ocid="tool.success_state"
-            >
-              ✓ Done! File ready.
-            </div>
-            <button
-              type="button"
-              onClick={onClose}
-              className="w-full py-2 rounded bg-[oklch(0.55_0.22_25)] hover:bg-[oklch(0.50_0.22_25)] text-white text-sm font-medium transition-colors"
-              data-ocid="tool.confirm_button"
-            >
-              Download File
-            </button>
-          </>
-        )}
-      </div>
-    </div>
-  );
+function saveRecent(file: { name: string; size: number }) {
+  const list = loadRecent();
+  const updated = [
+    { name: file.name, size: file.size, lastOpened: Date.now() },
+    ...list.filter((f) => f.name !== file.name),
+  ].slice(0, 10);
+  localStorage.setItem(RECENT_KEY, JSON.stringify(updated));
 }
 
 export default function App() {
-  const [files, setFiles] = useState<PDFFile[]>([]);
-  const [activeFileId, setActiveFileId] = useState<string | null>(null);
-  const [activeTool, setActiveTool] = useState<ToolId | null>(null);
-  const [zoom, setZoom] = useState(100);
-  const [modalTool, setModalTool] = useState<ToolInfo | null>(null);
-  const [dragging, setDragging] = useState(false);
+  const [currentFile, setCurrentFile] = useState<CurrentFile | null>(null);
+  const [activeModal, setActiveModal] = useState<string | null>(null);
+  const [activeTool, setActiveTool] = useState<ActiveTool>("select");
+  const [annotations, setAnnotations] = useState<Annotation[]>([]);
+  const [zoom, setZoom] = useState(1.2);
+  const [pageCount, setPageCount] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [thumbnails, setThumbnails] = useState<string[]>([]);
+  const [recentFiles, setRecentFiles] = useState<RecentFile[]>(loadRecent);
+  const [sidebarTab, setSidebarTab] = useState<"files" | "thumbs">("files");
+  const [pendingSignatureDataUrl, setPendingSignatureDataUrl] = useState<
+    string | null
+  >(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const activeFile = files.find((f) => f.id === activeFileId) ?? null;
+  const openFile = useCallback((file: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const buffer = e.target?.result as ArrayBuffer;
+      setCurrentFile({ name: file.name, buffer });
+      setAnnotations([]);
+      setCurrentPage(1);
+      saveRecent({ name: file.name, size: file.size });
+      setRecentFiles(loadRecent());
+      setSidebarTab("thumbs");
+      toast.success(`Opened ${file.name}`);
+    };
+    reader.readAsArrayBuffer(file);
+  }, []);
 
-  const handleFiles = useCallback(
-    (fileList: FileList | null) => {
-      if (!fileList || fileList.length === 0) return;
-      const newFiles: PDFFile[] = [];
-      for (let i = 0; i < fileList.length; i++) {
-        const f = fileList[i];
-        if (f.type === "application/pdf" || f.name.endsWith(".pdf")) {
-          const url = URL.createObjectURL(f);
-          const id = `${Date.now()}-${i}`;
-          newFiles.push({ id, name: f.name, url });
-        }
-      }
-      if (newFiles.length === 0) {
-        toast.error("Please select PDF files only.");
-        return;
-      }
-      setFiles((prev) => {
-        const updated = [...prev, ...newFiles];
-        if (!activeFileId) setActiveFileId(updated[0].id);
-        return updated;
-      });
-      if (!activeFileId && newFiles.length > 0) {
-        setActiveFileId(newFiles[0].id);
-      }
-      toast.success(
-        `Opened ${newFiles.length} PDF${newFiles.length > 1 ? "s" : ""}`,
-      );
+  const handleFileSelect = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file && file.type === "application/pdf") openFile(file);
+      else if (file) toast.error("Please select a PDF file");
+      e.target.value = "";
     },
-    [activeFileId],
-  );
-
-  const handleTool = useCallback(
-    (toolId: ToolId) => {
-      const allTools = [
-        ...annotateTools,
-        ...editTools,
-        ...organizeTools,
-        ...convertTools,
-      ];
-      const tool = allTools.find((t) => t.id === toolId)!;
-      if (tool.modal) {
-        if (!activeFile) {
-          toast.error("Open a PDF first.");
-          return;
-        }
-        setModalTool(tool);
-        setActiveTool(null);
-      } else {
-        if (!activeFile) {
-          toast.error("Open a PDF first.");
-          return;
-        }
-        const next = activeTool === toolId ? null : toolId;
-        setActiveTool(next);
-        if (next) toast.success(`${tool.label} tool active`);
-      }
-    },
-    [activeFile, activeTool],
+    [openFile],
   );
 
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
-      setDragging(false);
-      handleFiles(e.dataTransfer.files);
+      const file = e.dataTransfer.files[0];
+      if (file && file.type === "application/pdf") openFile(file);
+      else toast.error("Please drop a PDF file");
     },
-    [handleFiles],
+    [openFile],
   );
 
-  const allTools = [
-    ...annotateTools,
-    ...editTools,
-    ...organizeTools,
-    ...convertTools,
-  ];
-  const activeToolInfo = allTools.find((t) => t.id === activeTool) ?? null;
+  const handleAddAnnotation = useCallback((ann: Annotation) => {
+    setAnnotations((prev) => [...prev, ann]);
+  }, []);
+
+  const handleDeleteAnnotation = useCallback((id: string) => {
+    setAnnotations((prev) => prev.filter((a) => a.id !== id));
+  }, []);
+
+  const handleSignatureInsert = useCallback((dataUrl: string) => {
+    setPendingSignatureDataUrl(dataUrl);
+    setActiveTool("signature");
+    setActiveModal(null);
+    toast.info("Click on the PDF page to place your signature");
+  }, []);
 
   return (
-    <div className="flex flex-col h-screen bg-[oklch(0.14_0.03_270)] text-white select-none overflow-hidden">
-      {/* Top Menu Bar */}
-      <header
-        className="flex items-center justify-between px-3 shrink-0 bg-[oklch(0.12_0.025_270)] border-b border-[oklch(0.22_0.02_270)]"
-        style={{ height: 40 }}
-        data-ocid="topbar.panel"
-      >
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1.5">
-            <div className="w-5 h-5 rounded bg-[oklch(0.55_0.22_25)] flex items-center justify-center">
-              <FileText size={11} className="text-white" />
+    <div className="flex flex-col h-screen overflow-hidden bg-background">
+      <Toaster theme="dark" position="bottom-right" />
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="application/pdf"
+        className="hidden"
+        onChange={handleFileSelect}
+      />
+
+      <Toolbar
+        hasFile={!!currentFile}
+        fileName={currentFile?.name}
+        activeTool={activeTool}
+        onToolChange={setActiveTool}
+        zoom={zoom}
+        onZoomChange={setZoom}
+        currentPage={currentPage}
+        pageCount={pageCount}
+        onPageChange={setCurrentPage}
+        onOpenFile={() => fileInputRef.current?.click()}
+        onOpenModal={setActiveModal}
+        annotations={annotations}
+        currentFile={currentFile}
+      />
+
+      <div className="flex flex-1 overflow-hidden">
+        <Sidebar
+          activeTab={sidebarTab}
+          onTabChange={setSidebarTab}
+          recentFiles={recentFiles}
+          thumbnails={thumbnails}
+          currentPage={currentPage}
+          onPageSelect={setCurrentPage}
+          onOpenFile={() => fileInputRef.current?.click()}
+        />
+
+        {currentFile ? (
+          <PDFViewer
+            buffer={currentFile.buffer}
+            activeTool={activeTool}
+            annotations={annotations}
+            onAnnotationAdd={handleAddAnnotation}
+            onAnnotationDelete={handleDeleteAnnotation}
+            zoom={zoom}
+            currentPage={currentPage}
+            onPageChange={setCurrentPage}
+            onPageCountChange={setPageCount}
+            onThumbnailsReady={setThumbnails}
+            pendingSignatureDataUrl={pendingSignatureDataUrl}
+            onSignaturePlaced={() => {
+              setPendingSignatureDataUrl(null);
+              setActiveTool("select");
+            }}
+          />
+        ) : (
+          <Dashboard
+            onDrop={handleDrop}
+            onOpenFile={() => fileInputRef.current?.click()}
+            onOpenModal={setActiveModal}
+          />
+        )}
+      </div>
+
+      {activeModal === "sign" && (
+        <SignatureModal
+          onClose={() => setActiveModal(null)}
+          onInsert={handleSignatureInsert}
+        />
+      )}
+      {activeModal === "ocr" && (
+        <OCRModal
+          onClose={() => setActiveModal(null)}
+          currentBuffer={currentFile?.buffer}
+          currentPage={currentPage}
+        />
+      )}
+      {activeModal === "merge" && (
+        <MergeModal onClose={() => setActiveModal(null)} />
+      )}
+      {activeModal === "split" && currentFile && (
+        <SplitModal
+          onClose={() => setActiveModal(null)}
+          buffer={currentFile.buffer}
+          fileName={currentFile.name}
+          pageCount={pageCount}
+        />
+      )}
+      {activeModal === "protect" && currentFile && (
+        <ProtectModal
+          onClose={() => setActiveModal(null)}
+          buffer={currentFile.buffer}
+          fileName={currentFile.name}
+        />
+      )}
+      {activeModal === "create-images" && (
+        <CreateFromImagesModal onClose={() => setActiveModal(null)} />
+      )}
+    </div>
+  );
+}
+
+const FEATURE_CARDS = [
+  {
+    icon: PenTool,
+    label: "Annotate & Highlight",
+    desc: "Add highlights, drawings, and comments",
+    color: "#e84c22",
+  },
+  {
+    icon: FileText,
+    label: "E-Signatures",
+    desc: "Draw or type your signature",
+    modal: "sign",
+    color: "#3b82f6",
+  },
+  {
+    icon: ScanText,
+    label: "OCR Text Extract",
+    desc: "Extract text from scanned documents",
+    modal: "ocr",
+    color: "#10b981",
+  },
+  {
+    icon: Merge,
+    label: "Merge PDFs",
+    desc: "Combine multiple PDFs into one",
+    modal: "merge",
+    color: "#8b5cf6",
+  },
+  {
+    icon: Scissors,
+    label: "Split PDF",
+    desc: "Split PDF into smaller files",
+    modal: "split",
+    color: "#f59e0b",
+  },
+  {
+    icon: Shield,
+    label: "Password Protect",
+    desc: "Encrypt and protect your PDF",
+    modal: "protect",
+    color: "#ef4444",
+  },
+  {
+    icon: ImagePlus,
+    label: "Create from Images",
+    desc: "Build a PDF from JPG/PNG files",
+    modal: "create-images",
+    color: "#06b6d4",
+  },
+  {
+    icon: Layers,
+    label: "All Features Free",
+    desc: "No login, no payment required",
+    color: "#e84c22",
+  },
+];
+
+function Dashboard({
+  onDrop,
+  onOpenFile,
+  onOpenModal,
+}: {
+  onDrop: (e: React.DragEvent) => void;
+  onOpenFile: () => void;
+  onOpenModal: (modal: string) => void;
+}) {
+  const [dragOver, setDragOver] = useState(false);
+
+  return (
+    <main
+      className="flex-1 overflow-y-auto scrollbar-thin p-8"
+      data-ocid="dashboard.section"
+    >
+      <div className="max-w-4xl mx-auto">
+        <div className="mb-10 text-center">
+          <div className="flex items-center justify-center gap-3 mb-2">
+            <div
+              className="w-10 h-10 rounded-lg flex items-center justify-center"
+              style={{ background: "#e84c22" }}
+            >
+              <FileText className="w-5 h-5 text-white" />
             </div>
-            <span className="text-sm font-semibold tracking-tight">
+            <h1 className="text-3xl font-bold tracking-tight text-foreground">
               SmartAcroReader
-            </span>
+            </h1>
           </div>
-          <div className="h-4 w-px bg-[oklch(0.25_0.02_270)]" />
-          {["File", "Edit", "View", "Tools", "Help"].map((item) => (
+          <p className="text-muted-foreground text-sm">
+            Professional PDF Editor — All features free, no account required
+          </p>
+        </div>
+
+        {/* Drop zone as button for a11y */}
+        <button
+          type="button"
+          className={`w-full border-2 border-dashed rounded-xl p-14 text-center cursor-pointer transition-all mb-10 ${
+            dragOver
+              ? "border-primary"
+              : "border-border hover:border-muted-foreground"
+          }`}
+          style={{
+            background: dragOver
+              ? "oklch(58% 0.22 30 / 0.05)"
+              : "oklch(16% 0 0)",
+          }}
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDragOver(true);
+          }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={(e) => {
+            setDragOver(false);
+            onDrop(e);
+          }}
+          onClick={onOpenFile}
+          data-ocid="dashboard.dropzone"
+        >
+          <Upload
+            className="w-12 h-12 mx-auto mb-4"
+            style={{ color: "#e84c22" }}
+          />
+          <p className="text-lg font-semibold text-foreground mb-1">
+            Drop a PDF here or click to upload
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Supports any PDF — annotate, sign, OCR, merge, split and more
+          </p>
+        </button>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {FEATURE_CARDS.map((card) => (
             <button
               type="button"
-              key={item}
-              className="text-xs text-[oklch(0.70_0.01_270)] hover:text-white px-1.5 py-0.5 rounded hover:bg-[oklch(0.22_0.025_270)] transition-colors flex items-center gap-0.5"
-              data-ocid={`menu.${item.toLowerCase()}_button`}
+              key={card.label}
+              onClick={() => card.modal && onOpenModal(card.modal)}
+              className="rounded-lg p-4 text-left transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+              style={{
+                background: "oklch(18% 0 0)",
+                border: "1px solid oklch(28% 0 0)",
+              }}
+              data-ocid={`dashboard.${card.label.toLowerCase().replace(/\s+/g, "-")}.card`}
             >
-              {item} <ChevronDown size={10} />
+              <div
+                className="w-9 h-9 rounded-lg flex items-center justify-center mb-3"
+                style={{ background: `${card.color}20` }}
+              >
+                <card.icon className="w-4 h-4" style={{ color: card.color }} />
+              </div>
+              <p className="font-semibold text-sm text-foreground mb-0.5">
+                {card.label}
+              </p>
+              <p className="text-xs" style={{ color: "oklch(62% 0 0)" }}>
+                {card.desc}
+              </p>
             </button>
           ))}
         </div>
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={() => setZoom((z) => Math.max(50, z - 10))}
-            className="w-6 h-6 flex items-center justify-center rounded hover:bg-[oklch(0.22_0.025_270)] text-[oklch(0.70_0.01_270)] hover:text-white transition-colors"
-            data-ocid="zoom.secondary_button"
+
+        <div
+          className="mt-12 text-center text-xs"
+          style={{ color: "oklch(45% 0 0)" }}
+        >
+          © {new Date().getFullYear()}. Built with ❤️ using{" "}
+          <a
+            href={`https://caffeine.ai?utm_source=caffeine-footer&utm_medium=referral&utm_content=${encodeURIComponent(window.location.hostname)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-muted-foreground transition-colors"
           >
-            <ZoomOut size={13} />
-          </button>
-          <span className="text-xs text-[oklch(0.70_0.01_270)] w-10 text-center">
-            {zoom}%
-          </span>
-          <button
-            type="button"
-            onClick={() => setZoom((z) => Math.min(300, z + 10))}
-            className="w-6 h-6 flex items-center justify-center rounded hover:bg-[oklch(0.22_0.025_270)] text-[oklch(0.70_0.01_270)] hover:text-white transition-colors"
-            data-ocid="zoom.primary_button"
-          >
-            <ZoomIn size={13} />
-          </button>
+            caffeine.ai
+          </a>
         </div>
-      </header>
-
-      {/* Body */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Left Sidebar */}
-        <aside
-          className="shrink-0 flex flex-col border-r border-[oklch(0.22_0.02_270)] overflow-hidden bg-[oklch(0.17_0.025_270)]"
-          style={{ width: 220 }}
-          data-ocid="sidebar.panel"
-        >
-          {/* Open PDF button */}
-          <div className="p-2 border-b border-[oklch(0.22_0.02_270)]">
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded bg-[oklch(0.55_0.22_25)] hover:bg-[oklch(0.50_0.22_25)] text-white text-sm font-medium transition-colors"
-              data-ocid="sidebar.upload_button"
-            >
-              <Upload size={13} />
-              Open PDF
-            </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".pdf,application/pdf"
-              multiple
-              className="hidden"
-              onChange={(e) => handleFiles(e.target.files)}
-              data-ocid="sidebar.dropzone"
-            />
-          </div>
-
-          {/* File list */}
-          {files.length > 0 && (
-            <div
-              className="border-b border-[oklch(0.22_0.02_270)] overflow-y-auto"
-              style={{ maxHeight: 160 }}
-            >
-              {files.map((f, i) => (
-                <button
-                  type="button"
-                  key={f.id}
-                  onClick={() => setActiveFileId(f.id)}
-                  className={`flex items-center gap-2 w-full px-3 py-2 text-left text-xs truncate transition-colors ${
-                    f.id === activeFileId
-                      ? "bg-[oklch(0.22_0.03_270)] text-white border-l-2 border-[oklch(0.55_0.22_25)]"
-                      : "text-[oklch(0.70_0.01_270)] hover:bg-[oklch(0.20_0.025_270)] hover:text-white"
-                  }`}
-                  data-ocid={`file.item.${i + 1}`}
-                >
-                  <FileText size={12} className="shrink-0" />
-                  <span className="truncate">{f.name}</span>
-                </button>
-              ))}
-            </div>
-          )}
-
-          {/* Tools */}
-          <div className="flex-1 overflow-y-auto p-1 pt-2">
-            <ToolSection
-              title="Annotate"
-              tools={annotateTools}
-              activeTool={activeTool}
-              onTool={handleTool}
-            />
-            <ToolSection
-              title="Edit"
-              tools={editTools}
-              activeTool={activeTool}
-              onTool={handleTool}
-            />
-            <ToolSection
-              title="Organize"
-              tools={organizeTools}
-              activeTool={activeTool}
-              onTool={handleTool}
-            />
-            <ToolSection
-              title="Convert"
-              tools={convertTools}
-              activeTool={activeTool}
-              onTool={handleTool}
-            />
-          </div>
-        </aside>
-
-        {/* Main Viewer */}
-        <main
-          className="flex-1 overflow-hidden relative"
-          style={{ background: "oklch(0.15 0.028 270)" }}
-          onDragOver={(e) => {
-            e.preventDefault();
-            setDragging(true);
-          }}
-          onDragLeave={() => setDragging(false)}
-          onDrop={handleDrop}
-          data-ocid="viewer.panel"
-        >
-          {dragging && (
-            <div
-              className="absolute inset-0 z-20 border-2 border-dashed border-[oklch(0.55_0.22_25)] bg-[oklch(0.55_0.22_25/0.08)] flex items-center justify-center"
-              data-ocid="viewer.dropzone"
-            >
-              <div className="text-center">
-                <Upload
-                  size={32}
-                  className="mx-auto mb-2 text-[oklch(0.55_0.22_25)]"
-                />
-                <p className="text-white font-medium">Drop PDFs here</p>
-              </div>
-            </div>
-          )}
-
-          {activeFile ? (
-            <div className="w-full h-full flex flex-col">
-              {/* Active tool banner */}
-              {activeToolInfo && (
-                <div
-                  className="flex items-center gap-3 px-4 py-2 bg-[oklch(0.20_0.025_270)] border-b border-[oklch(0.25_0.02_270)]"
-                  data-ocid="tool.panel"
-                >
-                  <div className="flex items-center gap-2 text-sm text-[oklch(0.55_0.22_25)] font-medium">
-                    {activeToolInfo.icon}
-                    {activeToolInfo.label} active
-                  </div>
-                  <span className="text-xs text-[oklch(0.60_0.01_270)]">
-                    {activeToolInfo.description}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setActiveTool(null)}
-                    className="ml-auto text-[oklch(0.55_0.015_270)] hover:text-white transition-colors"
-                    data-ocid="tool.close_button"
-                  >
-                    <X size={14} />
-                  </button>
-                </div>
-              )}
-              {/* PDF embed */}
-              <div className="flex-1 overflow-hidden">
-                <object
-                  data={activeFile.url}
-                  type="application/pdf"
-                  width="100%"
-                  height="100%"
-                  style={{ display: "block" }}
-                  data-ocid="viewer.canvas_target"
-                >
-                  <div className="flex flex-col items-center justify-center h-full text-[oklch(0.60_0.01_270)]">
-                    <FileText size={48} className="mb-4 opacity-40" />
-                    <p className="text-sm">
-                      Your browser does not support embedded PDFs.
-                    </p>
-                    <a
-                      href={activeFile.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="mt-3 text-sm text-[oklch(0.55_0.22_25)] underline"
-                    >
-                      Open PDF directly
-                    </a>
-                  </div>
-                </object>
-              </div>
-            </div>
-          ) : (
-            /* Empty state */
-            <div
-              className="flex flex-col items-center justify-center h-full px-8"
-              data-ocid="viewer.empty_state"
-            >
-              <button
-                type="button"
-                className="border-2 border-dashed border-[oklch(0.28_0.025_270)] rounded-xl p-10 mb-8 text-center max-w-sm w-full"
-                onClick={() => fileInputRef.current?.click()}
-                style={{ cursor: "pointer" }}
-                data-ocid="viewer.dropzone"
-              >
-                <div className="w-14 h-14 rounded-full bg-[oklch(0.55_0.22_25/0.15)] flex items-center justify-center mx-auto mb-4">
-                  <Upload size={24} className="text-[oklch(0.55_0.22_25)]" />
-                </div>
-                <p className="text-white font-semibold mb-1">
-                  Open a PDF to get started
-                </p>
-                <p className="text-xs text-[oklch(0.55_0.015_270)]">
-                  Drag & drop or click to browse
-                </p>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    fileInputRef.current?.click();
-                  }}
-                  className="mt-4 px-5 py-2 rounded bg-[oklch(0.55_0.22_25)] hover:bg-[oklch(0.50_0.22_25)] text-white text-sm font-medium transition-colors"
-                  data-ocid="viewer.upload_button"
-                >
-                  Browse Files
-                </button>
-              </button>
-
-              {/* Feature cards */}
-              <div className="grid grid-cols-3 gap-3 max-w-2xl w-full">
-                {featureCards.map((card) => (
-                  <div
-                    key={card.title}
-                    className="bg-[oklch(0.17_0.025_270)] border border-[oklch(0.22_0.02_270)] rounded-lg p-4"
-                  >
-                    <div className="text-[oklch(0.55_0.22_25)] mb-2">
-                      {card.icon}
-                    </div>
-                    <div className="text-white text-xs font-semibold mb-1">
-                      {card.title}
-                    </div>
-                    <div className="text-[10px] text-[oklch(0.55_0.015_270)] leading-relaxed">
-                      {card.desc}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </main>
       </div>
-
-      {/* Processing Modal */}
-      {modalTool && (
-        <ProcessingModal tool={modalTool} onClose={() => setModalTool(null)} />
-      )}
-
-      <Toaster position="bottom-right" theme="dark" />
-
-      {/* Footer */}
-      <footer
-        className="shrink-0 flex items-center justify-center px-4 text-[10px] text-[oklch(0.40_0.01_270)] bg-[oklch(0.12_0.025_270)] border-t border-[oklch(0.20_0.02_270)]"
-        style={{ height: 24 }}
-      >
-        © {new Date().getFullYear()}. Built with love using{" "}
-        <a
-          href={`https://caffeine.ai?utm_source=caffeine-footer&utm_medium=referral&utm_content=${encodeURIComponent(typeof window !== "undefined" ? window.location.hostname : "")}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="ml-1 underline hover:text-[oklch(0.55_0.22_25)] transition-colors"
-        >
-          caffeine.ai
-        </a>
-      </footer>
-    </div>
+    </main>
   );
 }
