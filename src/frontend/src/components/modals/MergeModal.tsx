@@ -111,27 +111,38 @@ export default function MergeModal({ onClose }: MergeModalProps) {
   return (
     <Dialog open onOpenChange={() => onClose()}>
       <DialogContent
-        className="max-w-lg"
+        className="max-w-lg rounded-2xl shadow-2xl border p-0 overflow-hidden"
         style={{
-          background: "oklch(18% 0 0)",
-          border: "1px solid oklch(28% 0 0)",
+          background: "oklch(14% 0.012 250)",
+          borderColor: "oklch(22% 0.02 250)",
         }}
         data-ocid="merge.dialog"
       >
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Merge className="w-5 h-5" style={{ color: "#8b5cf6" }} />
+        <DialogHeader
+          className="flex flex-row items-center justify-between px-6 py-4 border-b"
+          style={{ borderColor: "oklch(22% 0.02 250)" }}
+        >
+          <DialogTitle className="flex items-center gap-2 text-base font-semibold">
+            <Merge className="w-4 h-4" style={{ color: "#8b5cf6" }} />
             Merge PDFs
           </DialogTitle>
-        </DialogHeader>
-
-        <div className="space-y-4">
           <button
             type="button"
-            className={`w-full border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
-              dragOver ? "border-primary" : "hover:border-muted-foreground"
-            }`}
-            style={{ borderColor: dragOver ? "#8b5cf6" : "oklch(35% 0 0)" }}
+            onClick={onClose}
+            className="rounded-lg p-1 transition-colors hover:bg-secondary/60"
+            style={{ color: "oklch(55% 0.02 250)" }}
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </DialogHeader>
+
+        <div className="p-6 space-y-4">
+          <button
+            type="button"
+            className="w-full border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors"
+            style={{
+              borderColor: dragOver ? "#8b5cf6" : "oklch(28% 0.02 250)",
+            }}
             onDragOver={(e) => {
               e.preventDefault();
               setDragOver(true);
@@ -163,8 +174,8 @@ export default function MergeModal({ onClose }: MergeModalProps) {
               {files.map((f, i) => (
                 <li
                   key={`${f.name}-${i}`}
-                  className="flex items-center gap-2 rounded px-2 py-1.5"
-                  style={{ background: "oklch(22% 0 0)" }}
+                  className="flex items-center gap-2 rounded-lg px-2 py-1.5"
+                  style={{ background: "oklch(18% 0.015 250)" }}
                   data-ocid={`merge.item.${i + 1}`}
                 >
                   <div className="flex flex-col gap-0.5">
@@ -188,7 +199,7 @@ export default function MergeModal({ onClose }: MergeModalProps) {
                   <button
                     type="button"
                     onClick={() => removeFile(i)}
-                    className="text-muted-foreground hover:text-destructive"
+                    className="text-muted-foreground hover:text-destructive transition-colors"
                     data-ocid={`merge.delete_button.${i + 1}`}
                   >
                     <X className="w-3.5 h-3.5" />
@@ -210,8 +221,8 @@ export default function MergeModal({ onClose }: MergeModalProps) {
             <Button
               onClick={handleMerge}
               disabled={isMerging || files.length < 2}
-              className="flex-1"
-              style={{ background: "#8b5cf6" }}
+              className="flex-1 text-white"
+              style={{ background: "#3b7ef8" }}
               data-ocid="merge.submit_button"
             >
               {isMerging ? "Merging..." : `Merge ${files.length} PDFs`}

@@ -7,7 +7,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Scissors } from "lucide-react";
+import { Scissors, X } from "lucide-react";
 import { PDFDocument } from "pdf-lib";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -111,21 +111,32 @@ export default function SplitModal({
   return (
     <Dialog open onOpenChange={() => onClose()}>
       <DialogContent
-        className="max-w-md"
+        className="max-w-md rounded-2xl shadow-2xl border p-0 overflow-hidden"
         style={{
-          background: "oklch(18% 0 0)",
-          border: "1px solid oklch(28% 0 0)",
+          background: "oklch(14% 0.012 250)",
+          borderColor: "oklch(22% 0.02 250)",
         }}
         data-ocid="split.dialog"
       >
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Scissors className="w-5 h-5" style={{ color: "#f59e0b" }} />
+        <DialogHeader
+          className="flex flex-row items-center justify-between px-6 py-4 border-b"
+          style={{ borderColor: "oklch(22% 0.02 250)" }}
+        >
+          <DialogTitle className="flex items-center gap-2 text-base font-semibold">
+            <Scissors className="w-4 h-4" style={{ color: "#f59e0b" }} />
             Split PDF
           </DialogTitle>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg p-1 transition-colors hover:bg-secondary/60"
+            style={{ color: "oklch(55% 0.02 250)" }}
+          >
+            <X className="w-4 h-4" />
+          </button>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="p-6 space-y-4">
           <p className="text-sm text-muted-foreground">
             <strong className="text-foreground">{fileName}</strong> —{" "}
             {pageCount} pages
@@ -153,7 +164,7 @@ export default function SplitModal({
                   onChange={(e) => setRangeInput(e.target.value)}
                   placeholder="1-3, 4-6, 7"
                   className="h-8 text-sm"
-                  style={{ background: "oklch(14% 0 0)" }}
+                  style={{ background: "oklch(11% 0.015 250)" }}
                   data-ocid="split.ranges.input"
                 />
               </div>
@@ -185,8 +196,8 @@ export default function SplitModal({
             <Button
               onClick={handleSplit}
               disabled={isSplitting || (!splitAll && !rangeInput.trim())}
-              className="flex-1"
-              style={{ background: "#f59e0b", color: "#1a1a1a" }}
+              className="flex-1 text-white"
+              style={{ background: "#3b7ef8" }}
               data-ocid="split.submit_button"
             >
               {isSplitting ? "Splitting..." : "Split & Download"}

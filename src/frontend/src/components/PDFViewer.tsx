@@ -1,3 +1,4 @@
+import { Skeleton } from "@/components/ui/skeleton";
 import * as pdfjsLib from "pdfjs-dist";
 import type { PDFDocumentProxy, PDFPageProxy } from "pdfjs-dist";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -25,6 +26,8 @@ interface PDFViewerProps {
   onThumbnailsReady: (thumbs: string[]) => void;
   pendingSignatureDataUrl: string | null;
   onSignaturePlaced: () => void;
+  drawColor: string;
+  drawWidth: number;
 }
 
 export default function PDFViewer({
@@ -40,6 +43,8 @@ export default function PDFViewer({
   onThumbnailsReady,
   pendingSignatureDataUrl,
   onSignaturePlaced,
+  drawColor,
+  drawWidth,
 }: PDFViewerProps) {
   const pdfDocRef = useRef<PDFDocumentProxy | null>(null);
   const [pageCount, setPageCount] = useState(0);
@@ -49,7 +54,6 @@ export default function PDFViewer({
   const pageRefs = useRef<(HTMLCanvasElement | null)[]>([]);
   const renderTasksRef = useRef<Map<number, { cancel: () => void }>>(new Map());
   const bufferRef = useRef<ArrayBuffer | null>(null);
-  // Stable refs to avoid effect re-runs
   const onPageCountChangeRef = useRef(onPageCountChange);
   const onThumbnailsReadyRef = useRef(onThumbnailsReady);
   onPageCountChangeRef.current = onPageCountChange;
@@ -76,7 +80,6 @@ export default function PDFViewer({
     [],
   );
 
-  // Load PDF when buffer changes
   useEffect(() => {
     if (!buffer || buffer === bufferRef.current) return;
     bufferRef.current = buffer;
@@ -167,7 +170,6 @@ export default function PDFViewer({
     [zoom],
   );
 
-  // Render all pages when version or zoom changes
   // biome-ignore lint/correctness/useExhaustiveDependencies: renderVersion triggers re-render
   useEffect(() => {
     if (!pdfDocRef.current || pageCount === 0) return;
@@ -177,7 +179,6 @@ export default function PDFViewer({
     }
   }, [renderVersion, zoom, pageCount, renderPage]);
 
-  // Scroll to page on external change
   useEffect(() => {
     if (!containerRef.current) return;
     const pageEl = containerRef.current.querySelector(
@@ -186,7 +187,6 @@ export default function PDFViewer({
     if (pageEl) pageEl.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [currentPage]);
 
-  // Track visible page via IntersectionObserver
   useEffect(() => {
     if (!containerRef.current || pageCount === 0) return;
     const root = containerRef.current;
@@ -218,6 +218,8 @@ export default function PDFViewer({
         return "crosshair";
       case "comment":
         return "text";
+      case "text":
+        return "text";
       case "eraser":
         return "cell";
       case "signature":
@@ -231,10 +233,24 @@ export default function PDFViewer({
     <div
       ref={containerRef}
       className="flex-1 overflow-y-auto overflow-x-auto scrollbar-thin"
-      style={{ background: "oklch(10% 0 0)", cursor: getCursor() }}
+      style={{ background: "oklch(8% 0.01 250)", cursor: getCursor() }}
       data-ocid="viewer.canvas_target"
     >
-      <div className="flex flex-col items-center py-6 gap-6">
+      <div className="flex flex-col items-center py-8 gap-8">
+        {pageCount === 0 && (
+          <div
+            className="flex flex-col items-center gap-6 py-4"
+            data-ocid="viewer.loading_state"
+          >
+            {[0, 1, 2].map((i) => (
+              <Skeleton
+                key={i}
+                className="w-[595px] h-[842px] rounded"
+                style={{ background: "oklch(14% 0.012 250)" }}
+              />
+            ))}
+          </div>
+        )}
         {Array.from({ length: pageCount }, (_, i) => {
           const dim = pageDimensions[i];
           const pageNum = i + 1;
@@ -248,7 +264,8 @@ export default function PDFViewer({
               className="relative"
               style={{
                 width: dim ? `${dim.width * zoom}px` : "auto",
-                boxShadow: "0 4px 24px rgba(0,0,0,0.6)",
+                boxShadow:
+                  "0 4px 32px rgba(0,0,0,0.7), 0 0 0 1px oklch(22% 0.02 250)",
               }}
             >
               <canvas
@@ -268,19 +285,13 @@ export default function PDFViewer({
                   onAnnotationDelete={onAnnotationDelete}
                   pendingSignatureDataUrl={pendingSignatureDataUrl}
                   onSignaturePlaced={onSignaturePlaced}
+                  drawColor={drawColor}
+                  drawWidth={drawWidth}
                 />
               )}
             </div>
           );
         })}
-        {pageCount === 0 && (
-          <div
-            className="flex items-center justify-center h-64 text-muted-foreground"
-            data-ocid="viewer.loading_state"
-          >
-            <p>Loading PDF...</p>
-          </div>
-        )}
       </div>
     </div>
   );

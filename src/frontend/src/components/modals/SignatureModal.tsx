@@ -8,6 +8,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 interface SignatureModalProps {
@@ -122,127 +123,146 @@ export default function SignatureModal({
   return (
     <Dialog open onOpenChange={() => onClose()}>
       <DialogContent
-        className="max-w-lg"
+        className="max-w-lg rounded-2xl shadow-2xl border p-0 overflow-hidden"
         style={{
-          background: "oklch(18% 0 0)",
-          border: "1px solid oklch(28% 0 0)",
+          background: "oklch(14% 0.012 250)",
+          borderColor: "oklch(22% 0.02 250)",
         }}
         data-ocid="signature.dialog"
       >
-        <DialogHeader>
-          <DialogTitle>Add Signature</DialogTitle>
+        <DialogHeader
+          className="flex flex-row items-center justify-between px-6 py-4 border-b"
+          style={{ borderColor: "oklch(22% 0.02 250)" }}
+        >
+          <DialogTitle className="text-base font-semibold">
+            Add Signature
+          </DialogTitle>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg p-1 transition-colors hover:bg-secondary/60"
+            style={{ color: "oklch(55% 0.02 250)" }}
+            data-ocid="signature.close.button"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </DialogHeader>
 
-        <Tabs defaultValue="draw">
-          <TabsList className="w-full">
-            <TabsTrigger
-              value="draw"
-              className="flex-1"
-              data-ocid="signature.draw.tab"
-            >
-              Draw
-            </TabsTrigger>
-            <TabsTrigger
-              value="type"
-              className="flex-1"
-              data-ocid="signature.type.tab"
-            >
-              Type
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="draw" className="mt-4">
-            <canvas
-              ref={canvasRef}
-              width={460}
-              height={160}
-              className="w-full rounded border cursor-crosshair"
-              style={{
-                border: "1px solid oklch(35% 0 0)",
-                background: "white",
-              }}
-              onMouseDown={startDraw}
-              onMouseMove={draw}
-              onMouseUp={stopDraw}
-              onMouseLeave={stopDraw}
-              onTouchStart={startDraw}
-              onTouchMove={draw}
-              onTouchEnd={stopDraw}
-              data-ocid="signature.canvas_target"
-            />
-            <div className="flex gap-2 mt-3">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={clearCanvas}
+        <div className="p-6">
+          <Tabs defaultValue="draw">
+            <TabsList className="w-full mb-4">
+              <TabsTrigger
+                value="draw"
                 className="flex-1"
-                data-ocid="signature.clear.button"
+                data-ocid="signature.draw.tab"
               >
-                Clear
-              </Button>
-              <Button
-                size="sm"
-                onClick={insertDrawn}
+                Draw
+              </TabsTrigger>
+              <TabsTrigger
+                value="type"
                 className="flex-1"
-                style={{ background: "#e84c22" }}
-                data-ocid="signature.insert.button"
+                data-ocid="signature.type.tab"
               >
-                Insert Signature
-              </Button>
-            </div>
-          </TabsContent>
+                Type
+              </TabsTrigger>
+            </TabsList>
 
-          <TabsContent value="type" className="mt-4">
-            <div className="space-y-3">
-              <div>
-                <Label className="text-xs mb-1 block">Type your name</Label>
-                <Input
-                  value={typedName}
-                  onChange={(e) => setTypedName(e.target.value)}
-                  placeholder="Your full name"
-                  className="text-base"
-                  style={{ fontFamily: "Georgia, serif", fontStyle: "italic" }}
-                  data-ocid="signature.name.input"
-                />
-              </div>
-              {typedName && (
-                <div
-                  className="w-full h-20 flex items-center justify-center rounded"
-                  style={{
-                    border: "1px solid oklch(35% 0 0)",
-                    fontFamily: "Georgia, serif",
-                    fontStyle: "italic",
-                    fontSize: "2rem",
-                    color: "#1a1a1a",
-                    background: "white",
-                  }}
+            <TabsContent value="draw" className="mt-0">
+              <canvas
+                ref={canvasRef}
+                width={460}
+                height={160}
+                className="w-full rounded-lg border cursor-crosshair"
+                style={{
+                  borderColor: "oklch(28% 0.02 250)",
+                  background: "white",
+                }}
+                onMouseDown={startDraw}
+                onMouseMove={draw}
+                onMouseUp={stopDraw}
+                onMouseLeave={stopDraw}
+                onTouchStart={startDraw}
+                onTouchMove={draw}
+                onTouchEnd={stopDraw}
+                data-ocid="signature.canvas_target"
+              />
+              <div className="flex gap-2 mt-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={clearCanvas}
+                  className="flex-1"
+                  data-ocid="signature.clear.button"
                 >
-                  {typedName}
-                </div>
-              )}
-              <Button
-                size="sm"
-                className="w-full"
-                style={{ background: "#e84c22" }}
-                onClick={insertTyped}
-                disabled={!typedName.trim()}
-                data-ocid="signature.insert_typed.button"
-              >
-                Insert Signature
-              </Button>
-            </div>
-          </TabsContent>
-        </Tabs>
+                  Clear
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={insertDrawn}
+                  className="flex-1 text-white"
+                  style={{ background: "#3b7ef8" }}
+                  data-ocid="signature.insert.button"
+                >
+                  Insert Signature
+                </Button>
+              </div>
+            </TabsContent>
 
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onClose}
-          className="mt-2"
-          data-ocid="signature.close.button"
-        >
-          Cancel
-        </Button>
+            <TabsContent value="type" className="mt-0">
+              <div className="space-y-3">
+                <div>
+                  <Label className="text-xs mb-1 block">Type your name</Label>
+                  <Input
+                    value={typedName}
+                    onChange={(e) => setTypedName(e.target.value)}
+                    placeholder="Your full name"
+                    className="text-base"
+                    style={{
+                      fontFamily: "Georgia, serif",
+                      fontStyle: "italic",
+                    }}
+                    data-ocid="signature.name.input"
+                  />
+                </div>
+                {typedName && (
+                  <div
+                    className="w-full h-20 flex items-center justify-center rounded-lg"
+                    style={{
+                      border: "1px solid oklch(28% 0.02 250)",
+                      fontFamily: "Georgia, serif",
+                      fontStyle: "italic",
+                      fontSize: "2rem",
+                      color: "#1a1a1a",
+                      background: "white",
+                    }}
+                  >
+                    {typedName}
+                  </div>
+                )}
+                <Button
+                  size="sm"
+                  className="w-full text-white"
+                  style={{ background: "#3b7ef8" }}
+                  onClick={insertTyped}
+                  disabled={!typedName.trim()}
+                  data-ocid="signature.insert_typed.button"
+                >
+                  Insert Signature
+                </Button>
+              </div>
+            </TabsContent>
+          </Tabs>
+
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onClose}
+            className="mt-3 w-full"
+            data-ocid="signature.cancel.button"
+          >
+            Cancel
+          </Button>
+        </div>
       </DialogContent>
     </Dialog>
   );

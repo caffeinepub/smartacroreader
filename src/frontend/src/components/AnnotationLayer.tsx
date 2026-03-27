@@ -6,6 +6,7 @@ import type {
   DrawAnnotation,
   HighlightAnnotation,
   SignatureAnnotation,
+  TextAnnotation,
 } from "../types/pdf";
 
 interface AnnotationLayerProps {
@@ -18,10 +19,20 @@ interface AnnotationLayerProps {
   onAnnotationDelete: (id: string) => void;
   pendingSignatureDataUrl: string | null;
   onSignaturePlaced: () => void;
+  drawColor: string;
+  drawWidth: number;
 }
 
 function uuid() {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
+}
+
+// Convert hex color to rgba with opacity
+function hexToRgba(hex: string, alpha: number): string {
+  const r = Number.parseInt(hex.slice(1, 3), 16);
+  const g = Number.parseInt(hex.slice(3, 5), 16);
+  const b = Number.parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
 }
 
 export default function AnnotationLayer({
@@ -34,6 +45,8 @@ export default function AnnotationLayer({
   onAnnotationDelete,
   pendingSignatureDataUrl,
   onSignaturePlaced,
+  drawColor,
+  drawWidth,
 }: AnnotationLayerProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [drawingPoints, setDrawingPoints] = useState<
@@ -97,6 +110,21 @@ export default function AnnotationLayer({
       return;
     }
 
+    if (activeTool === "text") {
+      const pct = toPercent(pos.x, pos.y);
+      const id = uuid();
+      const ann: TextAnnotation = {
+        id,
+        pageNum,
+        type: "text",
+        pos: pct,
+        text: "",
+      };
+      onAnnotationAdd(ann);
+      setEditingComment({ id, text: "" });
+      return;
+    }
+
     if (activeTool === "highlight") {
       isDrawing.current = true;
       setHighlightRect({
@@ -150,6 +178,7 @@ export default function AnnotationLayer({
         pageNum,
         type: "highlight",
         rect: { x: r.x, y: r.y, w: rw, h: rh },
+        color: drawColor,
       };
       onAnnotationAdd(ann);
       setHighlightRect(null);
@@ -160,8 +189,8 @@ export default function AnnotationLayer({
         pageNum,
         type: "draw",
         points: drawingPoints,
-        color: "#e84c22",
-        width: 2.5,
+        color: drawColor,
+        width: drawWidth,
       };
       onAnnotationAdd(ann);
       setDrawingPoints([]);
@@ -202,6 +231,9 @@ export default function AnnotationLayer({
           .filter((a) => a.type === "highlight")
           .map((ann) => {
             const a = ann as HighlightAnnotation;
+            const fillColor = a.color
+              ? hexToRgba(a.color, 0.35)
+              : "rgba(255, 235, 0, 0.35)";
             return (
               <rect
                 key={a.id}
@@ -209,7 +241,7 @@ export default function AnnotationLayer({
                 y={`${a.rect.y}%`}
                 width={`${a.rect.w}%`}
                 height={`${a.rect.h}%`}
-                className="annotation-highlight"
+                fill={fillColor}
                 onClick={(e) => eraseOnClick(e, a.id)}
                 onKeyDown={(e) => e.key === "Delete" && eraseOnClick(e, a.id)}
                 style={{
@@ -250,7 +282,7 @@ export default function AnnotationLayer({
             y={highlightRect.y}
             width={highlightRect.w}
             height={highlightRect.h}
-            className="annotation-highlight"
+            fill={hexToRgba(drawColor, 0.35)}
             style={{ pointerEvents: "none" }}
           />
         )}
@@ -261,8 +293,8 @@ export default function AnnotationLayer({
               .map((p) => `${(p.x / 100) * width},${(p.y / 100) * height}`)
               .join(" ")}
             fill="none"
-            stroke="#e84c22"
-            strokeWidth={2.5}
+            stroke={drawColor}
+            strokeWidth={drawWidth}
             strokeLinecap="round"
             strokeLinejoin="round"
             style={{ pointerEvents: "none" }}
@@ -320,6 +352,8 @@ export default function AnnotationLayer({
                     border: "1px solid oklch(75% 0.18 80)",
                     resize: "both",
                   }}
+                  // biome-ignore lint/a11y/noAutofocus: annotation editor needs auto-focus
+                  autoFocus
                   defaultValue={a.text}
                   onBlur={(e) => {
                     a.text = e.target.value;
@@ -354,6 +388,78 @@ export default function AnnotationLayer({
                 >
                   {a.text || (
                     <span className="italic opacity-60">Click to edit</span>
+                  )}
+                </button>
+              )}
+            </article>
+          );
+        })}
+
+      {annotations
+        .filter((a) => a.type === "text")
+        .map((ann) => {
+          const a = ann as TextAnnotation;
+          const isEditing = editingComment?.id === a.id;
+          return (
+            <article
+              key={a.id}
+              style={{
+                position: "absolute",
+                left: `${a.pos.x}%`,
+                top: `${a.pos.y}%`,
+                zIndex: 10,
+                pointerEvents: "all",
+              }}
+            >
+              {isEditing ? (
+                <textarea
+                  className="w-40 h-16 text-xs p-1 rounded border"
+                  style={{
+                    background: "rgba(255, 252, 180, 0.9)",
+                    color: "#1a1a1a",
+                    border: "1px solid rgba(200, 180, 0, 0.6)",
+                    resize: "both",
+                    fontSize: "11px",
+                  }}
+                  // biome-ignore lint/a11y/noAutofocus: text annotation editor needs auto-focus
+                  autoFocus
+                  defaultValue={a.text}
+                  onBlur={(e) => {
+                    a.text = e.target.value;
+                    setEditingComment(null);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape") setEditingComment(null);
+                  }}
+                />
+              ) : (
+                <button
+                  type="button"
+                  className="max-w-48 text-left rounded shadow-md"
+                  style={{
+                    background: "rgba(255, 252, 180, 0.88)",
+                    color: "#1a1a1a",
+                    border: "1px solid rgba(200, 180, 0, 0.5)",
+                    padding: "3px 6px",
+                    fontSize: "11px",
+                    minWidth: "60px",
+                    cursor: activeTool === "eraser" ? "pointer" : "text",
+                  }}
+                  onClick={(e) => {
+                    if (activeTool === "eraser") {
+                      eraseOnClick(e, a.id);
+                      return;
+                    }
+                    setEditingComment({ id: a.id, text: a.text });
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Delete") eraseOnClick(e, a.id);
+                    if (e.key === "Enter")
+                      setEditingComment({ id: a.id, text: a.text });
+                  }}
+                >
+                  {a.text || (
+                    <span className="italic opacity-50">Type here...</span>
                   )}
                 </button>
               )}

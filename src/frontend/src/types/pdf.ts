@@ -4,13 +4,15 @@ export type ActiveTool =
   | "draw"
   | "comment"
   | "eraser"
-  | "signature";
+  | "signature"
+  | "text";
 
 export interface HighlightAnnotation {
   id: string;
   pageNum: number;
   type: "highlight";
   rect: { x: number; y: number; w: number; h: number };
+  color?: string;
 }
 
 export interface DrawAnnotation {
@@ -38,11 +40,20 @@ export interface SignatureAnnotation {
   rect: { x: number; y: number; w: number; h: number };
 }
 
+export interface TextAnnotation {
+  id: string;
+  pageNum: number;
+  type: "text";
+  pos: { x: number; y: number };
+  text: string;
+}
+
 export type Annotation =
   | HighlightAnnotation
   | DrawAnnotation
   | CommentAnnotation
-  | SignatureAnnotation;
+  | SignatureAnnotation
+  | TextAnnotation;
 
 export interface RecentFile {
   name: string;

@@ -102,25 +102,38 @@ export default function CreateFromImagesModal({
   return (
     <Dialog open onOpenChange={() => onClose()}>
       <DialogContent
-        className="max-w-lg"
+        className="max-w-lg rounded-2xl shadow-2xl border p-0 overflow-hidden"
         style={{
-          background: "oklch(18% 0 0)",
-          border: "1px solid oklch(28% 0 0)",
+          background: "oklch(14% 0.012 250)",
+          borderColor: "oklch(22% 0.02 250)",
         }}
         data-ocid="create_images.dialog"
       >
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <ImagePlus className="w-5 h-5" style={{ color: "#06b6d4" }} />
+        <DialogHeader
+          className="flex flex-row items-center justify-between px-6 py-4 border-b"
+          style={{ borderColor: "oklch(22% 0.02 250)" }}
+        >
+          <DialogTitle className="flex items-center gap-2 text-base font-semibold">
+            <ImagePlus className="w-4 h-4" style={{ color: "#06b6d4" }} />
             Create PDF from Images
           </DialogTitle>
-        </DialogHeader>
-
-        <div className="space-y-4">
           <button
             type="button"
-            className="w-full border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors"
-            style={{ borderColor: dragOver ? "#06b6d4" : "oklch(35% 0 0)" }}
+            onClick={onClose}
+            className="rounded-lg p-1 transition-colors hover:bg-secondary/60"
+            style={{ color: "oklch(55% 0.02 250)" }}
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </DialogHeader>
+
+        <div className="p-6 space-y-4">
+          <button
+            type="button"
+            className="w-full border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors"
+            style={{
+              borderColor: dragOver ? "#06b6d4" : "oklch(28% 0.02 250)",
+            }}
             onDragOver={(e) => {
               e.preventDefault();
               setDragOver(true);
@@ -152,7 +165,7 @@ export default function CreateFromImagesModal({
               {images.map((img, i) => (
                 <div
                   key={`${img.name}-${i}`}
-                  className="relative group rounded overflow-hidden"
+                  className="relative group rounded-lg overflow-hidden"
                   data-ocid={`create_images.item.${i + 1}`}
                 >
                   <img
@@ -171,7 +184,7 @@ export default function CreateFromImagesModal({
                   </button>
                   <p
                     className="text-xs text-center py-0.5 truncate px-1"
-                    style={{ color: "oklch(62% 0 0)" }}
+                    style={{ color: "oklch(52% 0.01 250)" }}
                   >
                     {img.name}
                   </p>
@@ -192,8 +205,8 @@ export default function CreateFromImagesModal({
             <Button
               onClick={handleCreate}
               disabled={isCreating || !images.length}
-              className="flex-1"
-              style={{ background: "#06b6d4", color: "#fff" }}
+              className="flex-1 text-white"
+              style={{ background: "#3b7ef8" }}
               data-ocid="create_images.submit_button"
             >
               {isCreating

@@ -7,7 +7,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { AlertTriangle, Shield } from "lucide-react";
+import { AlertTriangle, Shield, X } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -85,26 +85,37 @@ export default function ProtectModal({
   return (
     <Dialog open onOpenChange={() => onClose()}>
       <DialogContent
-        className="max-w-sm"
+        className="max-w-sm rounded-2xl shadow-2xl border p-0 overflow-hidden"
         style={{
-          background: "oklch(18% 0 0)",
-          border: "1px solid oklch(28% 0 0)",
+          background: "oklch(14% 0.012 250)",
+          borderColor: "oklch(22% 0.02 250)",
         }}
         data-ocid="protect.dialog"
       >
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Shield className="w-5 h-5" style={{ color: "#ef4444" }} />
+        <DialogHeader
+          className="flex flex-row items-center justify-between px-6 py-4 border-b"
+          style={{ borderColor: "oklch(22% 0.02 250)" }}
+        >
+          <DialogTitle className="flex items-center gap-2 text-base font-semibold">
+            <Shield className="w-4 h-4" style={{ color: "#ef4444" }} />
             Password Protect
           </DialogTitle>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg p-1 transition-colors hover:bg-secondary/60"
+            style={{ color: "oklch(55% 0.02 250)" }}
+          >
+            <X className="w-4 h-4" />
+          </button>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="p-6 space-y-4">
           <div
-            className="flex items-start gap-2 rounded-lg p-3 text-xs"
+            className="flex items-start gap-2 rounded-xl p-3 text-xs"
             style={{
-              background: "oklch(22% 0.03 30)",
-              border: "1px solid oklch(35% 0.05 30)",
+              background: "oklch(18% 0.025 45)",
+              border: "1px solid oklch(30% 0.04 45)",
             }}
           >
             <AlertTriangle
@@ -124,7 +135,7 @@ export default function ProtectModal({
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Enter password"
-              style={{ background: "oklch(14% 0 0)" }}
+              style={{ background: "oklch(11% 0.015 250)" }}
               data-ocid="protect.password.input"
             />
           </div>
@@ -135,7 +146,7 @@ export default function ProtectModal({
               value={confirm}
               onChange={(e) => setConfirm(e.target.value)}
               placeholder="Confirm password"
-              style={{ background: "oklch(14% 0 0)" }}
+              style={{ background: "oklch(11% 0.015 250)" }}
               data-ocid="protect.confirm.input"
             />
           </div>
@@ -152,8 +163,8 @@ export default function ProtectModal({
             <Button
               onClick={handleProtect}
               disabled={isProcessing}
-              className="flex-1"
-              style={{ background: "#ef4444" }}
+              className="flex-1 text-white"
+              style={{ background: "#3b7ef8" }}
               data-ocid="protect.submit_button"
             >
               {isProcessing ? "Processing..." : "Download Protected"}

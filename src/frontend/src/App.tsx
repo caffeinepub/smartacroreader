@@ -1,6 +1,8 @@
 import { Toaster } from "@/components/ui/sonner";
 import {
+  FileDown,
   FileText,
+  FileUp,
   ImagePlus,
   Layers,
   Merge,
@@ -10,11 +12,16 @@ import {
   Shield,
   Upload,
 } from "lucide-react";
-import { useCallback, useRef, useState } from "react";
+import { motion } from "motion/react";
+import { PDFDocument, degrees } from "pdf-lib";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import PDFViewer from "./components/PDFViewer";
 import Sidebar from "./components/Sidebar";
+import StatusBar from "./components/StatusBar";
 import Toolbar from "./components/Toolbar";
+import ConvertToPdfModal from "./components/modals/ConvertToPdfModal";
+import ConvertToWordModal from "./components/modals/ConvertToWordModal";
 import CreateFromImagesModal from "./components/modals/CreateFromImagesModal";
 import MergeModal from "./components/modals/MergeModal";
 import OCRModal from "./components/modals/OCRModal";
@@ -61,6 +68,8 @@ export default function App() {
   const [pendingSignatureDataUrl, setPendingSignatureDataUrl] = useState<
     string | null
   >(null);
+  const [drawColor, setDrawColor] = useState("#e84c22");
+  const [drawWidth, setDrawWidth] = useState(2.5);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const openFile = useCallback((file: File) => {
@@ -106,12 +115,45 @@ export default function App() {
     setAnnotations((prev) => prev.filter((a) => a.id !== id));
   }, []);
 
+  const handleUndoAnnotation = useCallback(() => {
+    setAnnotations((prev) => prev.slice(0, -1));
+  }, []);
+
   const handleSignatureInsert = useCallback((dataUrl: string) => {
     setPendingSignatureDataUrl(dataUrl);
     setActiveTool("signature");
     setActiveModal(null);
     toast.info("Click on the PDF page to place your signature");
   }, []);
+
+  const handleRotatePage = useCallback(async () => {
+    if (!currentFile) return;
+    try {
+      const pdfDoc = await PDFDocument.load(currentFile.buffer.slice(0));
+      const page = pdfDoc.getPage(currentPage - 1);
+      const currentRotation = page.getRotation().angle;
+      page.setRotation(degrees(currentRotation + 90));
+      const pdfBytes = await pdfDoc.save();
+      const newBuffer = pdfBytes.buffer as ArrayBuffer;
+      setCurrentFile({ name: currentFile.name, buffer: newBuffer });
+      toast.success(`Page ${currentPage} rotated`);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to rotate page");
+    }
+  }, [currentFile, currentPage]);
+
+  // Ctrl+Z / Meta+Z undo
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "z") {
+        e.preventDefault();
+        handleUndoAnnotation();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [handleUndoAnnotation]);
 
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-background">
@@ -139,6 +181,12 @@ export default function App() {
         onOpenModal={setActiveModal}
         annotations={annotations}
         currentFile={currentFile}
+        drawColor={drawColor}
+        drawWidth={drawWidth}
+        onDrawColorChange={setDrawColor}
+        onDrawWidthChange={setDrawWidth}
+        onUndoAnnotation={handleUndoAnnotation}
+        onRotatePage={handleRotatePage}
       />
 
       <div className="flex flex-1 overflow-hidden">
@@ -169,6 +217,8 @@ export default function App() {
               setPendingSignatureDataUrl(null);
               setActiveTool("select");
             }}
+            drawColor={drawColor}
+            drawWidth={drawWidth}
           />
         ) : (
           <Dashboard
@@ -178,6 +228,14 @@ export default function App() {
           />
         )}
       </div>
+
+      <StatusBar
+        activeTool={activeTool}
+        fileName={currentFile?.name}
+        currentPage={currentPage}
+        pageCount={pageCount}
+        zoom={zoom}
+      />
 
       {activeModal === "sign" && (
         <SignatureModal
@@ -213,6 +271,16 @@ export default function App() {
       {activeModal === "create-images" && (
         <CreateFromImagesModal onClose={() => setActiveModal(null)} />
       )}
+      {activeModal === "pdf-to-word" && (
+        <ConvertToWordModal
+          onClose={() => setActiveModal(null)}
+          currentBuffer={currentFile?.buffer}
+          fileName={currentFile?.name}
+        />
+      )}
+      {activeModal === "word-to-pdf" && (
+        <ConvertToPdfModal onClose={() => setActiveModal(null)} />
+      )}
     </div>
   );
 }
@@ -229,7 +297,7 @@ const FEATURE_CARDS = [
     label: "E-Signatures",
     desc: "Draw or type your signature",
     modal: "sign",
-    color: "#3b82f6",
+    color: "#3b7ef8",
   },
   {
     icon: ScanText,
@@ -267,6 +335,20 @@ const FEATURE_CARDS = [
     color: "#06b6d4",
   },
   {
+    icon: FileDown,
+    label: "PDF → Word",
+    desc: "Export text to DOCX",
+    modal: "pdf-to-word",
+    color: "#2563eb",
+  },
+  {
+    icon: FileUp,
+    label: "Word → PDF",
+    desc: "Convert DOCX to PDF",
+    modal: "word-to-pdf",
+    color: "#16a34a",
+  },
+  {
     icon: Layers,
     label: "All Features Free",
     desc: "No login, no payment required",
@@ -291,35 +373,43 @@ function Dashboard({
       data-ocid="dashboard.section"
     >
       <div className="max-w-4xl mx-auto">
-        <div className="mb-10 text-center">
-          <div className="flex items-center justify-center gap-3 mb-2">
+        {/* Hero */}
+        <motion.div
+          className="mb-10 text-center"
+          initial={{ opacity: 0, y: -16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4 }}
+        >
+          <div className="flex items-center justify-center gap-3 mb-3">
             <div
-              className="w-10 h-10 rounded-lg flex items-center justify-center"
-              style={{ background: "#e84c22" }}
+              className="w-12 h-12 rounded-xl flex items-center justify-center shadow-lg"
+              style={{
+                background: "linear-gradient(135deg, #e84c22, #c0360e)",
+                boxShadow: "0 0 20px #e84c2240",
+              }}
             >
-              <FileText className="w-5 h-5 text-white" />
+              <FileText className="w-6 h-6 text-white" />
             </div>
-            <h1 className="text-3xl font-bold tracking-tight text-foreground">
+            <h1 className="text-4xl font-bold tracking-tight gradient-text">
               SmartAcroReader
             </h1>
           </div>
-          <p className="text-muted-foreground text-sm">
-            Professional PDF Editor — All features free, no account required
+          <p style={{ color: "oklch(55% 0.02 250)" }} className="text-sm">
+            Professional PDF Editor — All tools free, no account required
           </p>
-        </div>
+        </motion.div>
 
-        {/* Drop zone as button for a11y */}
-        <button
+        {/* Drop zone */}
+        <motion.button
           type="button"
-          className={`w-full border-2 border-dashed rounded-xl p-14 text-center cursor-pointer transition-all mb-10 ${
-            dragOver
-              ? "border-primary"
-              : "border-border hover:border-muted-foreground"
-          }`}
+          className="w-full rounded-2xl p-14 text-center cursor-pointer transition-all mb-10 relative overflow-hidden"
           style={{
             background: dragOver
-              ? "oklch(58% 0.22 30 / 0.05)"
-              : "oklch(16% 0 0)",
+              ? "oklch(14% 0.02 250)"
+              : "oklch(11% 0.015 250)",
+            boxShadow: dragOver
+              ? "0 0 0 1px #3b7ef860, 0 0 32px #3b7ef818"
+              : "0 0 0 1px oklch(22% 0.02 250)",
           }}
           onDragOver={(e) => {
             e.preventDefault();
@@ -331,52 +421,82 @@ function Dashboard({
             onDrop(e);
           }}
           onClick={onOpenFile}
+          whileHover={{ scale: 1.005 }}
+          whileTap={{ scale: 0.998 }}
           data-ocid="dashboard.dropzone"
         >
-          <Upload
-            className="w-12 h-12 mx-auto mb-4"
-            style={{ color: "#e84c22" }}
+          <div
+            className="absolute inset-0 rounded-2xl dropzone-animated opacity-60"
+            style={{ pointerEvents: "none" }}
           />
-          <p className="text-lg font-semibold text-foreground mb-1">
-            Drop a PDF here or click to upload
-          </p>
-          <p className="text-sm text-muted-foreground">
-            Supports any PDF — annotate, sign, OCR, merge, split and more
-          </p>
-        </button>
+          <div className="relative z-10">
+            <div className="pulse-icon inline-block">
+              <Upload
+                className="w-12 h-12 mx-auto mb-4"
+                style={{
+                  color: dragOver ? "#3b7ef8" : "#e84c22",
+                  filter: dragOver
+                    ? "drop-shadow(0 0 8px #3b7ef860)"
+                    : "drop-shadow(0 0 6px #e84c2240)",
+                  transition: "color 0.2s, filter 0.2s",
+                }}
+              />
+            </div>
+            <p className="text-lg font-semibold text-foreground mb-1">
+              Drop a PDF here or click to upload
+            </p>
+            <p style={{ color: "oklch(55% 0.02 250)" }} className="text-sm">
+              Annotate, sign, OCR, merge, split and more — all in your browser
+            </p>
+          </div>
+        </motion.button>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {FEATURE_CARDS.map((card) => (
-            <button
+        {/* Feature cards */}
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3">
+          {FEATURE_CARDS.map((card, idx) => (
+            <motion.button
               type="button"
               key={card.label}
               onClick={() => card.modal && onOpenModal(card.modal)}
-              className="rounded-lg p-4 text-left transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+              className="rounded-xl p-4 text-left cursor-pointer"
               style={{
-                background: "oklch(18% 0 0)",
-                border: "1px solid oklch(28% 0 0)",
+                background:
+                  "linear-gradient(135deg, oklch(14% 0.012 250), oklch(11% 0.015 250))",
+                border: "1px solid oklch(22% 0.02 250)",
               }}
-              data-ocid={`dashboard.${card.label.toLowerCase().replace(/\s+/g, "-")}.card`}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: idx * 0.04, duration: 0.3 }}
+              whileHover={{
+                scale: 1.02,
+                y: -2,
+                boxShadow: `0 0 16px ${card.color}30, 0 0 0 1px ${card.color}20`,
+              }}
+              whileTap={{ scale: 0.98 }}
+              data-ocid="dashboard.card"
             >
               <div
                 className="w-9 h-9 rounded-lg flex items-center justify-center mb-3"
-                style={{ background: `${card.color}20` }}
+                style={{ background: `${card.color}18` }}
               >
                 <card.icon className="w-4 h-4" style={{ color: card.color }} />
               </div>
-              <p className="font-semibold text-sm text-foreground mb-0.5">
+              <p className="font-semibold text-xs text-foreground mb-0.5 leading-snug">
                 {card.label}
               </p>
-              <p className="text-xs" style={{ color: "oklch(62% 0 0)" }}>
+              <p
+                className="text-xs leading-snug"
+                style={{ color: "oklch(52% 0.01 250)" }}
+              >
                 {card.desc}
               </p>
-            </button>
+            </motion.button>
           ))}
         </div>
 
         <div
           className="mt-12 text-center text-xs"
-          style={{ color: "oklch(45% 0 0)" }}
+          style={{ color: "oklch(38% 0.01 250)" }}
         >
           © {new Date().getFullYear()}. Built with ❤️ using{" "}
           <a
